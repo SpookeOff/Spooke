@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Spooke</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Reset & Base ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --black:   #0a0a0a;
+      --navy:    #0f172a;
+      --violet:  #7c3aed;
+      --blue:    #3b82f6;
+      --violet2: #a855f7;
+      --blue2:   #60a5fa;
+      --white:   #f8fafc;
+      --glass-bg: rgba(15, 23, 42, 0.55);
+      --glass-border: rgba(124, 58, 237, 0.35);
+      --glow-v: 0 0 20px rgba(124,58,237,0.7), 0 0 60px rgba(124,58,237,0.3);
+      --glow-b: 0 0 20px rgba(59,130,246,0.7), 0 0 60px rgba(59,130,246,0.3);
+    }
+
+    html, body {
+      width: 100%; height: 100%;
+      background: var(--black);
+      color: var(--white);
+      font-family: 'Rajdhani', sans-serif;
+      overflow: hidden;
+    }
+
+    /* ── Loading Screen ── */
+    #loader {
+      position: fixed; inset: 0; z-index: 9999;
+      background: #000;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 32px;
+      transition: opacity 0.8s ease, visibility 0.8s ease;
+    }
+    #loader.hidden { opacity: 0; visibility: hidden; }
+
+    .loader-title {
+      font-family: 'Orbitron', monospace;
+      font-size: clamp(1.4rem, 4vw, 2.2rem);
+      font-weight: 700;
+      letter-spacing: 0.25em;
+      color: var(--white);
+      text-shadow: var(--glow-v);
+      animation: pulse-text 1.5s ease-in-out infinite;
+    }
+
+    .loader-bar-wrap {
+      width: min(340px, 80vw);
+      height: 3px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 999px;
+      overflow: hidden;
+      border: 1px solid rgba(124,58,237,0.2);
+    }
+    .loader-bar {
+      height: 100%;
+      width: 0%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--violet), var(--blue), var(--violet2));
+      background-size: 200% 100%;
+      animation: bar-fill 2.2s cubic-bezier(0.4,0,0.2,1) forwards,
+                 gradient-shift 1.5s linear infinite;
+      box-shadow: 0 0 12px rgba(124,58,237,0.8);
+    }
+
+    .loader-dots {
+      display: flex; gap: 8px;
+    }
+    .loader-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--violet);
+      animation: dot-bounce 1.2s ease-in-out infinite;
+      box-shadow: 0 0 8px rgba(124,58,237,0.9);
+    }
+    .loader-dot:nth-child(2) { animation-delay: 0.2s; background: var(--blue); box-shadow: 0 0 8px rgba(59,130,246,0.9); }
+    .loader-dot:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes bar-fill { to { width: 100%; } }
+    @keyframes gradient-shift { 0%,100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+    @keyframes pulse-text { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
+    @keyframes dot-bounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+
+    /* ── Noise grain overlay ── */
+    #grain {
+      position: fixed; inset: 0; z-index: 1;
+      pointer-events: none;
+      opacity: 0.045;
+    }
+
+    /* ── Video Background ── */
+    #bg-video {
+      position: fixed; inset: 0; z-index: 0;
+      width: 100%; height: 100%;
+      object-fit: cover;
+    }
+    #bg-overlay {
+      position: fixed; inset: 0; z-index: 2;
+      background: rgba(0,0,0,0.6);
+    }
+
+    /* ── Particles ── */
+    #particles {
+      position: fixed; inset: 0; z-index: 3;
+      pointer-events: none;
+    }
+
+    /* ── Main layout ── */
+    #app {
+      position: relative; z-index: 10;
+      width: 100%; height: 100vh;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 20px;
+      opacity: 0;
+      animation: fade-in 1s ease 2.8s forwards;
+    }
+
+    @keyframes fade-in { to { opacity: 1; } }
+
+    /* ── Glass Card ── */
+    .card {
+      background: var(--glass-bg);
+      backdrop-filter: blur(24px) saturate(180%);
+      -webkit-backdrop-filter: blur(24px) saturate(180%);
+      border: 1px solid var(--glass-border);
+      border-radius: 24px;
+      padding: clamp(32px, 6vw, 56px) clamp(28px, 8vw, 72px);
+      width: min(560px, 96vw);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 32px;
+      box-shadow:
+        0 0 0 1px rgba(124,58,237,0.15),
+        0 8px 60px rgba(0,0,0,0.6),
+        inset 0 1px 0 rgba(255,255,255,0.06);
+      animation: float 6s ease-in-out infinite;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card::before {
+      content: '';
+      position: absolute; top: -1px; left: 20%; right: 20%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(124,58,237,0.8), rgba(59,130,246,0.8), transparent);
+    }
+    .card::after {
+      content: '';
+      position: absolute; inset: 0;
+      border-radius: 24px;
+      background: radial-gradient(ellipse at 50% 0%, rgba(124,58,237,0.08) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    @keyframes float {
+      0%,100% { transform: translateY(0px); }
+      50% { transform: translateY(-8px); }
+    }
+
+    /* ── Name ── */
+    .name {
+      font-family: 'Orbitron', monospace;
+      font-size: clamp(3rem, 12vw, 6rem);
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      text-align: center;
+      line-height: 1;
+      background: linear-gradient(135deg, #fff 0%, var(--violet2) 40%, var(--blue) 70%, #fff 100%);
+      background-size: 300% 300%;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      animation: name-gradient 4s ease-in-out infinite;
+      filter: drop-shadow(0 0 30px rgba(124,58,237,0.6)) drop-shadow(0 0 60px rgba(59,130,246,0.3));
+    }
+
+    @keyframes name-gradient {
+      0%,100% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+    }
+
+    .tagline {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.7rem;
+      letter-spacing: 0.35em;
+      color: rgba(255,255,255,0.4);
+      text-transform: uppercase;
+      margin-top: -20px;
+    }
+
+    /* ── Divider ── */
+    .divider {
+      width: 100%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(124,58,237,0.5), rgba(59,130,246,0.5), transparent);
+    }
+
+    /* ── Social Links ── */
+    .socials {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      width: 100%;
+    }
+
+    .social-link {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 12px 18px;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.06);
+      text-decoration: none;
+      color: var(--white);
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 1rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .social-link::before {
+      content: '';
+      position: absolute; inset: 0;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .social-link:hover {
+      transform: translateX(6px);
+      border-color: var(--accent, rgba(124,58,237,0.5));
+      background: rgba(124,58,237,0.08);
+    }
+    .social-link:hover .social-icon {
+      filter: drop-shadow(0 0 8px var(--accent, rgba(124,58,237,0.9)));
+      transform: scale(1.15);
+    }
+    .social-link:hover .social-name {
+      color: var(--accent-text, var(--violet2));
+    }
+    .social-link:hover { box-shadow: var(--glow-v), inset 0 0 0 1px rgba(124,58,237,0.3); }
+
+    .social-icon {
+      width: 22px; height: 22px;
+      flex-shrink: 0;
+      transition: all 0.3s ease;
+      opacity: 0.9;
+    }
+
+    .social-name {
+      flex: 1;
+      transition: color 0.3s ease;
+    }
+
+    .social-badge {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.65rem;
+      padding: 3px 10px;
+      border-radius: 999px;
+      background: rgba(124,58,237,0.2);
+      border: 1px solid rgba(124,58,237,0.4);
+      color: var(--violet2);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    /* Platform colors */
+    .yt  { --accent: rgba(255,0,0,0.6);      --accent-text: #ff4444; }
+    .sp  { --accent: rgba(30,215,96,0.6);    --accent-text: #1db954; }
+    .tw  { --accent: rgba(145,70,255,0.6);   --accent-text: #9146ff; }
+    .dc  { --accent: rgba(88,101,242,0.6);   --accent-text: #7289da; }
+    .ig  { --accent: rgba(255,165,0,0.6);    --accent-text: #ffa500; }
+
+    .yt:hover  { box-shadow: 0 0 20px rgba(255,0,0,0.4), inset 0 0 0 1px rgba(255,0,0,0.3); }
+    .sp:hover  { box-shadow: 0 0 20px rgba(30,215,96,0.4), inset 0 0 0 1px rgba(30,215,96,0.3); }
+    .tw:hover  { box-shadow: 0 0 20px rgba(145,70,255,0.4), inset 0 0 0 1px rgba(145,70,255,0.3); }
+    .dc:hover  { box-shadow: 0 0 20px rgba(88,101,242,0.4), inset 0 0 0 1px rgba(88,101,242,0.3); }
+    .ig:hover  { box-shadow: 0 0 20px rgba(255,165,0,0.4), inset 0 0 0 1px rgba(255,165,0,0.3); }
+
+    /* ── Music Player ── */
+    .music-player {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      border-radius: 12px;
+      background: rgba(124,58,237,0.08);
+      border: 1px solid rgba(124,58,237,0.2);
+    }
+
+    #play-btn {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      border: 1px solid rgba(124,58,237,0.5);
+      background: rgba(124,58,237,0.2);
+      color: white;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      transition: all 0.3s ease;
+      padding: 0;
+    }
+    #play-btn:hover {
+      background: rgba(124,58,237,0.4);
+      box-shadow: 0 0 16px rgba(124,58,237,0.6);
+      transform: scale(1.1);
+    }
+    #play-btn svg { width: 14px; height: 14px; }
+
+    .music-label {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.6rem;
+      letter-spacing: 0.15em;
+      color: rgba(255,255,255,0.4);
+      text-transform: uppercase;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      flex: 1;
+    }
+
+    .music-label span {
+      color: var(--violet2);
+    }
+
+    .volume-wrap {
+      display: flex; align-items: center; gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .vol-icon { width: 14px; height: 14px; opacity: 0.5; }
+
+    #volume {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 72px; height: 3px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 999px;
+      outline: none;
+      cursor: pointer;
+    }
+    #volume::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      background: var(--violet2);
+      cursor: pointer;
+      box-shadow: 0 0 8px rgba(168,85,247,0.8);
+      transition: transform 0.2s;
+    }
+    #volume::-webkit-slider-thumb:hover { transform: scale(1.3); }
+
+    /* ── Visualizer bars ── */
+    .visualizer {
+      display: flex; align-items: flex-end; gap: 3px;
+      height: 18px; flex-shrink: 0;
+    }
+    .vis-bar {
+      width: 3px; border-radius: 2px;
+      background: linear-gradient(to top, var(--violet), var(--blue));
+      animation: vis-dance 0.8s ease-in-out infinite;
+      box-shadow: 0 0 4px rgba(124,58,237,0.6);
+    }
+    .vis-bar:nth-child(1) { height: 6px;  animation-duration: 0.7s; }
+    .vis-bar:nth-child(2) { height: 12px; animation-duration: 0.9s; animation-delay: 0.1s; }
+    .vis-bar:nth-child(3) { height: 8px;  animation-duration: 0.6s; animation-delay: 0.2s; }
+    .vis-bar:nth-child(4) { height: 14px; animation-duration: 1.0s; animation-delay: 0.05s; }
+    .vis-bar:nth-child(5) { height: 5px;  animation-duration: 0.75s; animation-delay: 0.15s; }
+    .paused .vis-bar { animation-play-state: paused; }
+
+    @keyframes vis-dance {
+      0%,100% { transform: scaleY(1); }
+      50% { transform: scaleY(0.2); }
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 480px) {
+      .card { gap: 22px; }
+      .social-link { padding: 10px 14px; font-size: 0.9rem; }
+      .music-label { display: none; }
+      #volume { width: 56px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Loading Screen -->
+  <div id="loader">
+    <div class="loader-title">Loading Spooke...</div>
+    <div class="loader-bar-wrap">
+      <div class="loader-bar"></div>
+    </div>
+    <div class="loader-dots">
+      <div class="loader-dot"></div>
+      <div class="loader-dot"></div>
+      <div class="loader-dot"></div>
+    </div>
+  </div>
+
+  <!-- Grain canvas -->
+  <canvas id="grain"></canvas>
+
+  <!-- Video BG -->
+  <video id="bg-video" autoplay loop muted playsinline>
+    <source src="assets/bg.mp4" type="video/mp4" />
+  </video>
+  <div id="bg-overlay"></div>
+
+  <!-- Particles -->
+  <canvas id="particles"></canvas>
+
+  <!-- Audio -->
+  <audio id="music" loop>
+    <source src="assets/music.mp3" type="audio/mpeg" />
+  </audio>
+
+  <!-- App -->
+  <main id="app">
+    <div class="card">
+      <!-- Name -->
+      <div style="display:flex;flex-direction:column;align-items:center;gap:8px;">
+        <h1 class="name">SPOOKE</h1>
+        <p class="tagline">// content creator &amp; gamer</p>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- Socials -->
+      <div class="socials">
+
+        <a class="social-link yt" href="https://www.youtube.com/@iLoveSpooke" target="_blank" rel="noopener">
+          <svg class="social-icon" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+          </svg>
+          <span class="social-name">YouTube</span>
+          <svg style="width:14px;height:14px;opacity:0.3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+        </a>
+
+        <a class="social-link sp" href="https://open.spotify.com/user/31y6sior3jx4bcyz2t4rdi7j6q3i" target="_blank" rel="noopener">
+          <svg class="social-icon" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
+          </svg>
+          <span class="social-name">Spotify</span>
+          <svg style="width:14px;height:14px;opacity:0.3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+        </a>
+
+        <a class="social-link tw" href="https://www.twitch.tv/melroserp_" target="_blank" rel="noopener">
+          <svg class="social-icon" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z"/>
+          </svg>
+          <span class="social-name">Twitch</span>
+          <svg style="width:14px;height:14px;opacity:0.3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+        </a>
+
+        <div class="social-link dc" style="cursor:default;">
+          <svg class="social-icon" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057.1 18.079.111 18.1.12 18.12a19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/>
+          </svg>
+          <span class="social-name">Discord</span>
+          <span class="social-badge">anikomssclick</span>
+        </div>
+
+        <a class="social-link ig" href="https://www.instant-gaming.com/?igr=gamer-6209df" target="_blank" rel="noopener">
+          <svg class="social-icon" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M21 6H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h18a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1zm-1 10H4V8h16v8zM8 13.5V11a.5.5 0 0 1 .8-.4l2 1.5a.5.5 0 0 1 0 .8l-2 1.5a.5.5 0 0 1-.8-.4zM12 12h5v1h-5z"/>
+          </svg>
+          <span class="social-name">Instant Gaming</span>
+          <span class="social-badge">CODE : SPOOKE</span>
+        </a>
+
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- Music Player -->
+      <div class="music-player">
+        <button id="play-btn" aria-label="Play/Pause">
+          <svg id="play-icon" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          <svg id="pause-icon" viewBox="0 0 24 24" fill="currentColor" style="display:none"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+        </button>
+        <div class="visualizer" id="vis">
+          <div class="vis-bar"></div>
+          <div class="vis-bar"></div>
+          <div class="vis-bar"></div>
+          <div class="vis-bar"></div>
+          <div class="vis-bar"></div>
+        </div>
+        <span class="music-label">♪ <span>Ambient Mix</span></span>
+        <div class="volume-wrap">
+          <svg class="vol-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+            <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+          </svg>
+          <input type="range" id="volume" min="0" max="1" step="0.01" value="0.5" />
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <script>
+    /* ── Loader ── */
+    window.addEventListener('load', () => {
+      setTimeout(() => {
+        document.getElementById('loader').classList.add('hidden');
+      }, 2600);
+    });
+
+    /* ── Grain canvas ── */
+    const grain = document.getElementById('grain');
+    const gCtx  = grain.getContext('2d');
+    let grainFrame;
+
+    function resizeGrain() {
+      grain.width  = window.innerWidth;
+      grain.height = window.innerHeight;
+    }
+
+    function drawGrain() {
+      const w = grain.width, h = grain.height;
+      const img = gCtx.createImageData(w, h);
+      const data = img.data;
+      for (let i = 0; i < data.length; i += 4) {
+        const v = Math.random() * 255 | 0;
+        data[i] = data[i+1] = data[i+2] = v;
+        data[i+3] = 255;
+      }
+      gCtx.putImageData(img, 0, 0);
+      grainFrame = requestAnimationFrame(drawGrain);
+    }
+
+    resizeGrain();
+    drawGrain();
+    window.addEventListener('resize', resizeGrain);
+
+    /* ── Particles ── */
+    const pCanvas = document.getElementById('particles');
+    const pCtx    = pCanvas.getContext('2d');
+    let particles = [];
+
+    function resizeParticles() {
+      pCanvas.width  = window.innerWidth;
+      pCanvas.height = window.innerHeight;
+    }
+
+    function createParticle() {
+      return {
+        x: Math.random() * pCanvas.width,
+        y: Math.random() * pCanvas.height,
+        r: Math.random() * 1.8 + 0.3,
+        vx: (Math.random() - 0.5) * 0.3,
+        vy: -(Math.random() * 0.4 + 0.1),
+        alpha: Math.random() * 0.5 + 0.1,
+        color: Math.random() > 0.5 ? '124,58,237' : '59,130,246',
+        life: Math.random() * 200 + 100,
+        maxLife: 0,
+      };
+    }
+
+    function initParticles() {
+      particles = [];
+      for (let i = 0; i < 80; i++) {
+        const p = createParticle();
+        p.maxLife = p.life;
+        particles.push(p);
+      }
+    }
+
+    function animateParticles() {
+      pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height);
+      particles.forEach((p, i) => {
+        p.x  += p.vx;
+        p.y  += p.vy;
+        p.life--;
+
+        const fade = Math.min(p.life / 30, (p.maxLife - p.life) / 30, 1);
+        pCtx.beginPath();
+        pCtx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        pCtx.fillStyle = `rgba(${p.color},${p.alpha * fade})`;
+        pCtx.fill();
+
+        if (p.life <= 0 || p.y < -10 || p.x < -10 || p.x > pCanvas.width + 10) {
+          particles[i] = createParticle();
+          particles[i].maxLife = particles[i].life;
+        }
+      });
+      requestAnimationFrame(animateParticles);
+    }
+
+    resizeParticles();
+    initParticles();
+    animateParticles();
+    window.addEventListener('resize', () => { resizeParticles(); initParticles(); });
+
+    /* ── Music Player ── */
+    const music    = document.getElementById('music');
+    const playBtn  = document.getElementById('play-btn');
+    const playIcon = document.getElementById('play-icon');
+    const pauseIcon= document.getElementById('pause-icon');
+    const volSlider= document.getElementById('volume');
+    const vis      = document.getElementById('vis');
+    let playing    = false;
+
+    music.volume = 0.5;
+
+    playBtn.addEventListener('click', () => {
+      if (playing) {
+        music.pause();
+        playIcon.style.display  = '';
+        pauseIcon.style.display = 'none';
+        vis.classList.add('paused');
+      } else {
+        music.play().catch(() => {});
+        playIcon.style.display  = 'none';
+        pauseIcon.style.display = '';
+        vis.classList.remove('paused');
+      }
+      playing = !playing;
+    });
+
+    volSlider.addEventListener('input', () => {
+      music.volume = volSlider.value;
+    });
+  </script>
+</body>
+</html>
